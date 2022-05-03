@@ -23,21 +23,25 @@
 #include "ble_mesh_example_init.h"
 #include "board.h"
 
-#define TAG "EXAMPLE"
+#define TAG "MAIN"
 
 #define CID_ESP     0x02E5
 
 /* Sensor Property ID */
-#define SENSOR_PROPERTY_ID_0        0x0056  /* Present Indoor Ambient Temperature */
-#define SENSOR_PROPERTY_ID_1        0x005B  /* Present Outdoor Ambient Temperature */
+#define SENSOR_PROPERTY_ID_0        0x0075  /* Precise Ambient Temperature */
+#define SENSOR_PROPERTY_ID_1        0x00A7  /* Present Indoor Relative Humidity, */
+#define SENSOR_PROPERTY_ID_2		0x0079	/* Present Ambient Noise */
 
 /* The characteristic of the two device properties is "Temperature 8", which is
  * used to represent a measure of temperature with a unit of 0.5 degree Celsius.
  * Minimum value: -64.0, maximum value: 63.5.
  * A value of 0xFF represents 'value is not known'.
  */
-static int8_t indoor_temp = 40;     /* Indoor temperature is 20 Degrees Celsius */
-static int8_t outdoor_temp = 60;    /* Outdoor temperature is 30 Degrees Celsius */
+
+
+static int16_t indoor_temp = 0;			/* 16 bit signed scalar (Resolution: 0.01 C) */
+static uint16_t indoor_humidity = 0;    /* 16 bit unsigned scalar (Resolution: 0.01 %) */
+static uint8_t indoor_noise_level = 0;  /* 8 bit unsigned scalar (Resolution: 1 dB) */
 
 #define SENSOR_POSITIVE_TOLERANCE   ESP_BLE_MESH_SENSOR_UNSPECIFIED_POS_TOLERANCE
 #define SENSOR_NEGATIVE_TOLERANCE   ESP_BLE_MESH_SENSOR_UNSPECIFIED_NEG_TOLERANCE
@@ -66,8 +70,8 @@ static esp_ble_mesh_cfg_srv_t config_server = {
     .relay_retransmit = ESP_BLE_MESH_TRANSMIT(2, 20),
 };
 
-NET_BUF_SIMPLE_DEFINE_STATIC(sensor_data_0, 1);
-NET_BUF_SIMPLE_DEFINE_STATIC(sensor_data_1, 1);
+NET_BUF_SIMPLE_DEFINE_STATIC(sensor_data_0, 2);
+NET_BUF_SIMPLE_DEFINE_STATIC(sensor_data_1, 2); // Changed
 
 static esp_ble_mesh_sensor_state_t sensor_states[2] = {
     /* Mesh Model Spec:
@@ -94,7 +98,7 @@ static esp_ble_mesh_sensor_state_t sensor_states[2] = {
         .descriptor.measure_period = SENSOR_MEASURE_PERIOD,
         .descriptor.update_interval = SENSOR_UPDATE_INTERVAL,
         .sensor_data.format = ESP_BLE_MESH_SENSOR_DATA_FORMAT_A,
-        .sensor_data.length = 0, /* 0 represents the length is 1 */
+        .sensor_data.length = 1, /* 0 represents the length is 1 */
         .sensor_data.raw_value = &sensor_data_0,
     },
     [1] = {
@@ -105,7 +109,7 @@ static esp_ble_mesh_sensor_state_t sensor_states[2] = {
         .descriptor.measure_period = SENSOR_MEASURE_PERIOD,
         .descriptor.update_interval = SENSOR_UPDATE_INTERVAL,
         .sensor_data.format = ESP_BLE_MESH_SENSOR_DATA_FORMAT_A,
-        .sensor_data.length = 0, /* 0 represents the length is 1 */
+        .sensor_data.length = 1, /* 0 represents the length is 1 */
         .sensor_data.raw_value = &sensor_data_1,
     },
 };
@@ -154,8 +158,8 @@ static void prov_complete(uint16_t net_idx, uint16_t addr, uint8_t flags, uint32
     board_led_operation(LED_G, LED_OFF);
 
     /* Initialize the indoor and outdoor temperatures for each sensor.  */
-    net_buf_simple_add_u8(&sensor_data_0, indoor_temp);
-    net_buf_simple_add_u8(&sensor_data_1, outdoor_temp);
+    net_buf_simple_add_le16(&sensor_data_0, indoor_temp);
+    net_buf_simple_add_le16(&sensor_data_1, indoor_humidity);
 }
 
 static void example_ble_mesh_provisioning_cb(esp_ble_mesh_prov_cb_event_t event,
@@ -639,4 +643,21 @@ void app_main(void)
     if (err) {
         ESP_LOGE(TAG, "Bluetooth mesh init failed (err %d)", err);
     }
+
+    while(1) {
+    	vTaskDelay(pdMS_TO_TICKS(1000));
+    	indoor_temp += 50;
+    	indoor_humidity += 50;
+
+    	if (indoor_humidity > 10000) { /* max humidity value is 10000 (100%) */
+    		indoor_humidity = 0;
+    	}
+
+    	net_buf_simple_pull_le16(&sensor_data_0);
+    	net_buf_simple_push_le16(&sensor_data_0, indoor_temp);
+    	net_buf_simple_pull_le16(&sensor_data_1);
+    	net_buf_simple_push_le16(&sensor_data_1, indoor_humidity);
+    	ESP_LOGI(TAG, "Raw temp data %d (%.2f C); Raw humidity data: %d (%.2f %%)", indoor_temp, (float)indoor_temp/100, indoor_humidity, (float)indoor_humidity/100);
+    }
+
 }
