@@ -21,7 +21,8 @@
 #include "esp_ble_mesh_sensor_model_api.h"
 
 #include "ble_mesh_example_init.h"
-#include "board.h"
+
+#include "components/LED.h"
 
 #define TAG "MAIN"
 
@@ -31,6 +32,7 @@
 #define SENSOR_PROPERTY_ID_0        0x0075  /* Precise Ambient Temperature */
 #define SENSOR_PROPERTY_ID_1        0x00A7  /* Present Indoor Relative Humidity, */
 #define SENSOR_PROPERTY_ID_2		0x0079	/* Present Ambient Noise */
+#define SENSOR_PROPERTY_ID_3		0x0059  /* Present Input Voltage */
 
 /* The characteristic of the two device properties is "Temperature 8", which is
  * used to represent a measure of temperature with a unit of 0.5 degree Celsius.
@@ -42,6 +44,9 @@
 static int16_t indoor_temp = 0;			/* 16 bit signed scalar (Resolution: 0.01 C) */
 static uint16_t indoor_humidity = 0;    /* 16 bit unsigned scalar (Resolution: 0.01 %) */
 static uint8_t indoor_noise_level = 0;  /* 8 bit unsigned scalar (Resolution: 1 dB) */
+static uint16_t input_voltage = 0;		/* 16 bit unsigned scalar (Resolution: 1/64 V) */
+
+static int8_t HAS_APPKEY = false;   /* Flag is true when device is provisioned and has AppKey*/
 
 #define SENSOR_POSITIVE_TOLERANCE   ESP_BLE_MESH_SENSOR_UNSPECIFIED_POS_TOLERANCE
 #define SENSOR_NEGATIVE_TOLERANCE   ESP_BLE_MESH_SENSOR_UNSPECIFIED_NEG_TOLERANCE
@@ -155,13 +160,11 @@ static void prov_complete(uint16_t net_idx, uint16_t addr, uint8_t flags, uint32
 {
     ESP_LOGI(TAG, "net_idx 0x%03x, addr 0x%04x", net_idx, addr);
     ESP_LOGI(TAG, "flags 0x%02x, iv_index 0x%08x", flags, iv_index);
-    board_led_operation(LED_G, LED_OFF);
 
     /* Initialize the indoor and outdoor temperatures for each sensor.  */
     net_buf_simple_add_le16(&sensor_data_0, indoor_temp);
     net_buf_simple_add_le16(&sensor_data_1, indoor_humidity);
 }
-
 static void example_ble_mesh_provisioning_cb(esp_ble_mesh_prov_cb_event_t event,
                                              esp_ble_mesh_prov_cb_param_t *param)
 {
@@ -207,6 +210,7 @@ static void example_ble_mesh_config_server_cb(esp_ble_mesh_cfg_server_cb_event_t
                 param->value.state_change.appkey_add.net_idx,
                 param->value.state_change.appkey_add.app_idx);
             ESP_LOG_BUFFER_HEX("AppKey", param->value.state_change.appkey_add.app_key, 16);
+            HAS_APPKEY = true;
             break;
         case ESP_BLE_MESH_MODEL_OP_MODEL_APP_BIND:
             ESP_LOGI(TAG, "ESP_BLE_MESH_MODEL_OP_MODEL_APP_BIND");
@@ -480,6 +484,54 @@ send:
     free(status);
 }
 
+static void example_ble_mesh_publish_sensor_status()
+{
+    uint8_t *status = NULL;
+    uint16_t buf_size = 0;
+    uint16_t length = 0;
+    //uint32_t mpid = 0;
+    esp_err_t err;
+    int i;
+
+    for (i = 0; i < ARRAY_SIZE(sensor_states); i++) {
+        esp_ble_mesh_sensor_state_t *state = &sensor_states[i];
+        if (state->sensor_data.length == ESP_BLE_MESH_SENSOR_DATA_ZERO_LEN) {
+            buf_size += ESP_BLE_MESH_SENSOR_DATA_FORMAT_B_MPID_LEN;
+        } else {
+            /* Use "state->sensor_data.length + 1" because the length of sensor data is zero-based. */
+            if (state->sensor_data.format == ESP_BLE_MESH_SENSOR_DATA_FORMAT_A) {
+                buf_size += ESP_BLE_MESH_SENSOR_DATA_FORMAT_A_MPID_LEN + state->sensor_data.length + 1;
+            } else {
+                buf_size += ESP_BLE_MESH_SENSOR_DATA_FORMAT_B_MPID_LEN + state->sensor_data.length + 1;
+            }
+        }
+    }
+
+    status = calloc(1, buf_size);
+    if (!status) {
+        ESP_LOGE(TAG, "No memory for sensor status!");
+        return;
+    }
+
+
+    for (i = 0; i < ARRAY_SIZE(sensor_states); i++) {
+        length += example_ble_mesh_get_sensor_data(&sensor_states[i], status + length);
+    }
+
+
+    ESP_LOG_BUFFER_HEX("Sensor Data", status, length);
+
+    err = esp_ble_mesh_model_publish(&root_models[1], ESP_BLE_MESH_MODEL_OP_SENSOR_STATUS, length, status, ROLE_NODE);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to send Sensor Status %x", err);
+    } else {
+    	LED_setcolor(0, 255, 0);
+    	vTaskDelay(pdMS_TO_TICKS(50));
+    	LED_setcolor(0, 0, 0);
+    }
+    free(status);
+}
+
 static void example_ble_mesh_send_sensor_column_status(esp_ble_mesh_sensor_server_cb_param_t *param)
 {
     uint8_t *status = NULL;
@@ -608,8 +660,6 @@ static esp_err_t ble_mesh_init(void)
         return err;
     }
 
-    board_led_operation(LED_G, LED_ON);
-
     ESP_LOGI(TAG, "BLE Mesh sensor server initialized");
 
     return ESP_OK;
@@ -628,7 +678,9 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(err);
 
-    board_init();
+    LED_init();
+    vTaskDelay(pdMS_TO_TICKS(10));
+    LED_setcolor(0, 255, 255);
 
     err = bluetooth_init();
     if (err) {
@@ -644,8 +696,10 @@ void app_main(void)
         ESP_LOGE(TAG, "Bluetooth mesh init failed (err %d)", err);
     }
 
+    root_models[1].pub->publish_addr = 0xFFFF;
+
     while(1) {
-    	vTaskDelay(pdMS_TO_TICKS(1000));
+    	vTaskDelay(pdMS_TO_TICKS(10000));
     	indoor_temp += 50;
     	indoor_humidity += 50;
 
@@ -653,10 +707,17 @@ void app_main(void)
     		indoor_humidity = 0;
     	}
 
+    	/* Refresh network buffer with sensor data */
     	net_buf_simple_pull_le16(&sensor_data_0);
     	net_buf_simple_push_le16(&sensor_data_0, indoor_temp);
     	net_buf_simple_pull_le16(&sensor_data_1);
     	net_buf_simple_push_le16(&sensor_data_1, indoor_humidity);
+
+    	if(HAS_APPKEY) {
+    	example_ble_mesh_publish_sensor_status();
+    	LED_setcolor(0, 0, 0);
+    	}
+
     	ESP_LOGI(TAG, "Raw temp data %d (%.2f C); Raw humidity data: %d (%.2f %%)", indoor_temp, (float)indoor_temp/100, indoor_humidity, (float)indoor_humidity/100);
     }
 

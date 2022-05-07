@@ -2574,6 +2574,11 @@
 			<location>C:/Espressif/frameworks/esp-idf-v4.4/components/esp_hw_support/port/esp32c3/rtc_time.c</location>
 		</link>
 		<link>
+			<name>esp_idf_components/examples/common_components/led_strip/led_strip_rmt_ws2812.c</name>
+			<type>1</type>
+			<location>C:/Espressif/frameworks/esp-idf-v4.4/examples/common_components/led_strip/led_strip_rmt_ws2812.c</location>
+		</link>
+		<link>
 			<name>esp_idf_components/fatfs/port/freertos/ffsystem.c</name>
 			<type>1</type>
 			<location>C:/Espressif/frameworks/esp-idf-v4.4/components/fatfs/port/freertos/ffsystem.c</location>
