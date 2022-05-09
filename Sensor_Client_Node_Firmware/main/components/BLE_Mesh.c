@@ -15,7 +15,11 @@
 #include "LED.h"
 
 #define TAG "BLE_Mesh"
+#define DATA_TAG "DATA"
 #define CID_ESP             0x02E5
+
+
+#define BYTES_PER_LINE 16
 
 
 #define PROV_OWN_ADDR       0x0001
@@ -480,6 +484,38 @@ static void example_ble_mesh_sensor_timeout(uint32_t opcode)
 
 
 
+static void print_data_to_console(esp_ble_mesh_sensor_client_cb_param_t *param, uint16_t prop_id, const void *buffer, uint16_t buff_len){
+	if (buff_len == 0) {
+	        return;
+	    }
+	    char temp_buffer[BYTES_PER_LINE + 3]; //for not-byte-accessible memory
+	    char hex_buffer[3 * BYTES_PER_LINE + 1];
+	    const char *ptr_line;
+	    int bytes_cur_line;
+
+	    do {
+	        if (buff_len > BYTES_PER_LINE) {
+	            bytes_cur_line = BYTES_PER_LINE;
+	        } else {
+	            bytes_cur_line = buff_len;
+	        }
+	        if (!esp_ptr_byte_accessible(buffer)) {
+	            //use memcpy to get around alignment issue
+	            memcpy(temp_buffer, buffer, (bytes_cur_line + 3) / 4 * 4);
+	            ptr_line = temp_buffer;
+	        } else {
+	            ptr_line = buffer;
+	        }
+
+	        uint32_t myInt1 = ptr_line[0] + (ptr_line[1] << 8);
+
+	        ESP_LOG_LEVEL(ESP_LOG_INFO, DATA_TAG, "0x%04x 0x%04x 0x%02x %d end", param->params->ctx.recv_dst, param->params->ctx.addr , prop_id, myInt1);
+	        buffer += bytes_cur_line;
+	        buff_len -= bytes_cur_line;
+	    } while (buff_len);
+}
+
+
 
 static void example_ble_mesh_sensor_client_cb(esp_ble_mesh_sensor_client_cb_event_t event, esp_ble_mesh_sensor_client_cb_param_t *param)
 {
@@ -617,7 +653,7 @@ static void example_ble_mesh_sensor_client_cb(esp_ble_mesh_sensor_client_cb_even
     	                uint8_t mpid_len = (fmt == ESP_BLE_MESH_SENSOR_DATA_FORMAT_A ? ESP_BLE_MESH_SENSOR_DATA_FORMAT_A_MPID_LEN : ESP_BLE_MESH_SENSOR_DATA_FORMAT_B_MPID_LEN);
     	                ESP_LOGI(TAG, "Format %s, length 0x%02x, Sensor Property ID 0x%04x", fmt == ESP_BLE_MESH_SENSOR_DATA_FORMAT_A ? "A" : "B", data_len, prop_id);
     	                if (data_len != ESP_BLE_MESH_SENSOR_DATA_ZERO_LEN) {
-    	                    ESP_LOG_BUFFER_HEX("Sensor Data", data + mpid_len, data_len + 1);
+    	                    print_data_to_console(param, prop_id, data + mpid_len, data_len + 1);
     	                    length += mpid_len + data_len + 1;
     	                    data += mpid_len + data_len + 1;
     	                }
