@@ -23,8 +23,12 @@
 #include "ble_mesh_example_init.h"
 
 #include "components/LED.h"
+#include "driver/i2c.h"
+#include "components/commands.h"
+#include "components/communication.h"
 
 #define TAG "MAIN"
+#define DATA_TAG "DATA"
 
 #define CID_ESP     0x02E5
 
@@ -521,6 +525,8 @@ static void example_ble_mesh_publish_sensor_status()
 
     ESP_LOG_BUFFER_HEX("Sensor Data", status, length);
 
+
+    sensor_pub.ttl = 7;
     err = esp_ble_mesh_model_publish(&root_models[1], ESP_BLE_MESH_MODEL_OP_SENSOR_STATUS, length, status, ROLE_NODE);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to send Sensor Status %x", err);
@@ -682,6 +688,11 @@ void app_main(void)
     vTaskDelay(pdMS_TO_TICKS(10));
     LED_setcolor(0, 255, 255);
 
+    err = i2c_master_init();
+    if (err) {
+        ESP_LOGE(TAG, "I2C init error", err);
+    }
+
     err = bluetooth_init();
     if (err) {
         ESP_LOGE(TAG, "esp32_bluetooth_init failed (err %d)", err);
@@ -699,13 +710,19 @@ void app_main(void)
     root_models[1].pub->publish_addr = 0xFFFF;
 
     while(1) {
-    	vTaskDelay(pdMS_TO_TICKS(10000));
-    	indoor_temp += 50;
-    	indoor_humidity += 50;
+    	vTaskDelay(pdMS_TO_TICKS(1000));
+    	//indoor_temp += 50;
+    	//indoor_humidity += 50;
 
     	if (indoor_humidity > 10000) { /* max humidity value is 10000 (100%) */
-    		indoor_humidity = 0;
+    		indoor_humidity = 10000;
     	}
+
+
+        err = SHT35_single_measurement(&indoor_temp, &indoor_humidity);
+        if (err) {
+            ESP_LOGE(TAG, "I2C com error", err);
+        }
 
     	/* Refresh network buffer with sensor data */
     	net_buf_simple_pull_le16(&sensor_data_0);
@@ -719,6 +736,8 @@ void app_main(void)
     	}
 
     	ESP_LOGI(TAG, "Raw temp data %d (%.2f C); Raw humidity data: %d (%.2f %%)", indoor_temp, (float)indoor_temp/100, indoor_humidity, (float)indoor_humidity/100);
+    	ESP_LOGI(DATA_TAG, "0x%04x 0x%04x 0x%02x %d end", root_models[1].pub->publish_addr, 0x0027 , SENSOR_PROPERTY_ID_0, indoor_temp);
+    	ESP_LOGI(DATA_TAG, "0x%04x 0x%04x 0x%02x %d end", root_models[1].pub->publish_addr, 0x0027 , SENSOR_PROPERTY_ID_1, indoor_humidity);
     }
 
 }
