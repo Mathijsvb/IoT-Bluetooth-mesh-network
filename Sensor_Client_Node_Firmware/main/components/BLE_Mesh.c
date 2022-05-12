@@ -203,9 +203,11 @@ static void example_ble_mesh_provisioning_cb(esp_ble_mesh_prov_cb_event_t event,
         break;
     case ESP_BLE_MESH_PROVISIONER_PROV_LINK_OPEN_EVT:
         ESP_LOGI(TAG, "ESP_BLE_MESH_PROVISIONER_PROV_LINK_OPEN_EVT, bearer %s", param->provisioner_prov_link_open.bearer == ESP_BLE_MESH_PROV_ADV ? "PB-ADV" : "PB-GATT");
+        LED_setcolor(255,140,0);
         break;
     case ESP_BLE_MESH_PROVISIONER_PROV_LINK_CLOSE_EVT:
         ESP_LOGI(TAG, "ESP_BLE_MESH_PROVISIONER_PROV_LINK_CLOSE_EVT, bearer %s, reason 0x%02x", param->provisioner_prov_link_close.bearer == ESP_BLE_MESH_PROV_ADV ? "PB-ADV" : "PB-GATT", param->provisioner_prov_link_close.reason);
+        LED_setcolor(200,162,200);
         break;
     case ESP_BLE_MESH_PROVISIONER_PROV_COMPLETE_EVT:
         prov_complete(param->provisioner_prov_complete.node_idx, param->provisioner_prov_complete.device_uuid, param->provisioner_prov_complete.unicast_addr, param->provisioner_prov_complete.element_num, param->provisioner_prov_complete.netkey_idx);
@@ -689,6 +691,7 @@ esp_err_t ble_mesh_init(void)
     esp_ble_mesh_register_prov_callback(example_ble_mesh_provisioning_cb);
     esp_ble_mesh_register_config_client_callback(example_ble_mesh_config_client_cb);
     esp_ble_mesh_register_sensor_client_callback(example_ble_mesh_sensor_client_cb);
+
 
     err = esp_ble_mesh_init(&provision, &composition);
     if (err != ESP_OK) {

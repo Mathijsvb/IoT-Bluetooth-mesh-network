@@ -13,6 +13,7 @@
 
 #include "ble_mesh_example_init.h"
 #include "components/BLE_Mesh.h"
+#include "components/LED.h"
 
 #define TAG "MAIN"
 
@@ -29,6 +30,10 @@ void app_main(void)
 	    err = nvs_flash_init();
 	}
 	ESP_ERROR_CHECK(err);
+
+	LED_init();
+	vTaskDelay(pdMS_TO_TICKS(10));
+	LED_setcolor(200,162,200);
 
 	err = bluetooth_init();
 	if (err != ESP_OK) {
