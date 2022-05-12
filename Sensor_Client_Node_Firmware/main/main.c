@@ -33,7 +33,7 @@ void app_main(void)
 
 	LED_init();
 	vTaskDelay(pdMS_TO_TICKS(10));
-	LED_setcolor(200,162,200);
+	LED_setcolor(200,200,200);
 
 	err = bluetooth_init();
 	if (err != ESP_OK) {
