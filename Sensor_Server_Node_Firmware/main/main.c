@@ -714,30 +714,34 @@ void app_main(void)
     	//indoor_temp += 50;
     	//indoor_humidity += 50;
 
-    	if (indoor_humidity > 10000) { /* max humidity value is 10000 (100%) */
-    		indoor_humidity = 10000;
-    	}
+    	//if (indoor_humidity > 10000) { /* max humidity value is 10000 (100%) */
+    	//	indoor_humidity = 10000;
+    	//}
 
 
         err = SHT35_single_measurement(&indoor_temp, &indoor_humidity);
         if (err) {
-            ESP_LOGE(TAG, "I2C com error", err);
+            ESP_LOGE(TAG, "I2C com error 0x%x, is the I2C device connected?", err);
+        }else if(HAS_APPKEY) {
+            net_buf_simple_pull_le16(&sensor_data_0);
+            net_buf_simple_push_le16(&sensor_data_0, indoor_temp);
+            net_buf_simple_pull_le16(&sensor_data_1);
+            net_buf_simple_push_le16(&sensor_data_1, indoor_humidity);
+        	example_ble_mesh_publish_sensor_status();
+        	ESP_LOGI(DATA_TAG, "0x%04x 0x%04x 0x%02x %d end", root_models[1].pub->publish_addr, 0x0027 , SENSOR_PROPERTY_ID_0, indoor_temp);
+        	ESP_LOGI(DATA_TAG, "0x%04x 0x%04x 0x%02x %d end", root_models[1].pub->publish_addr, 0x0027 , SENSOR_PROPERTY_ID_1, indoor_humidity);
+
+
         }
 
-    	/* Refresh network buffer with sensor data */
-    	net_buf_simple_pull_le16(&sensor_data_0);
-    	net_buf_simple_push_le16(&sensor_data_0, indoor_temp);
-    	net_buf_simple_pull_le16(&sensor_data_1);
-    	net_buf_simple_push_le16(&sensor_data_1, indoor_humidity);
-
     	if(HAS_APPKEY) {
-    	example_ble_mesh_publish_sensor_status();
-    	LED_setcolor(0, 0, 0);
+    		LED_setcolor(0, 0, 0);
     	}
 
-    	ESP_LOGI(TAG, "Raw temp data %d (%.2f C); Raw humidity data: %d (%.2f %%)", indoor_temp, (float)indoor_temp/100, indoor_humidity, (float)indoor_humidity/100);
-    	ESP_LOGI(DATA_TAG, "0x%04x 0x%04x 0x%02x %d end", root_models[1].pub->publish_addr, 0x0027 , SENSOR_PROPERTY_ID_0, indoor_temp);
-    	ESP_LOGI(DATA_TAG, "0x%04x 0x%04x 0x%02x %d end", root_models[1].pub->publish_addr, 0x0027 , SENSOR_PROPERTY_ID_1, indoor_humidity);
+    	/* Refresh network buffer with sensor data */
+
+
+    	//ESP_LOGI(TAG, "Raw temp data %d (%.2f C); Raw humidity data: %d (%.2f %%)", indoor_temp, (float)indoor_temp/100, indoor_humidity, (float)indoor_humidity/100);
     }
 
 }
