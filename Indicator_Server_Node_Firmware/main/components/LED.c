@@ -28,10 +28,7 @@ void LED_init(){
 	ESP_ERROR_CHECK(led->refresh(led, 100));
 }
 
-
-
 void LED_setcolor(uint8_t red, uint8_t green, uint8_t blue){
 	ESP_ERROR_CHECK(led->set_pixel(led, 0, red, green, blue));
 	ESP_ERROR_CHECK(led->refresh(led, 100));
 }
-
