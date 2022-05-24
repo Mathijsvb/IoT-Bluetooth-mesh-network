@@ -23,7 +23,6 @@
 #include "esp_ble_mesh_local_data_operation_api.h"
 #include "components/LED.h"
 
-#include "board.h"
 #include "ble_mesh_example_init.h"
 
 static int8_t HAS_APPKEY = false;   /* Flag is true when device is provisioned and has AppKey*/
@@ -38,8 +37,6 @@ static int8_t HAS_APPKEY = false;   /* Flag is true when device is provisioned a
 
 #define CID_ESP 0x02E5
 
-extern struct _led_state led_state[3];
-
 volatile uint8_t red_channel = 0;
 volatile uint8_t green_channel = 0;
 volatile uint8_t blue_channel = 0;
@@ -47,7 +44,7 @@ volatile uint8_t blue_channel = 0;
 volatile uint8_t lighting_type = OFF;
 
 
-static uint8_t dev_uuid[16] = { 0xdd, 0xdd };
+static uint8_t dev_uuid[16] = { 0x32, 0x10 };
 
 static esp_ble_mesh_cfg_srv_t config_server = {
     .relay = ESP_BLE_MESH_RELAY_DISABLED,
@@ -135,34 +132,26 @@ static void prov_complete(uint16_t net_idx, uint16_t addr, uint8_t flags, uint32
 static void example_change_led_state(esp_ble_mesh_model_t *model,
                                      esp_ble_mesh_msg_ctx_t *ctx, uint8_t colour_state)
 {
-	/*
-	 *
-	 * 0: off
-	 * 1: white
-	 * 2: red
-	 * 3: green
-	 * 4: blue
-	 */
 
     uint16_t primary_addr = esp_ble_mesh_get_primary_element_address();
     uint8_t elem_count = esp_ble_mesh_get_element_count();
-    struct _led_state *led = NULL;
+    //struct _led_state *led = NULL;
     uint8_t i;
 
     if (ESP_BLE_MESH_ADDR_IS_UNICAST(ctx->recv_dst)) {
         for (i = 0; i < elem_count; i++) {
             if (ctx->recv_dst == (primary_addr + i)) {
-                led = &led_state[i];
+                //led = &led_state[i];
                 //board_led_operation(led->pin, onoff);
             }
         }
     } else if (ESP_BLE_MESH_ADDR_IS_GROUP(ctx->recv_dst)) {
         if (esp_ble_mesh_is_model_subscribed_to_group(model, ctx->recv_dst)) {
-            led = &led_state[model->element->element_addr - primary_addr];
+            //led = &led_state[model->element->element_addr - primary_addr];
             //board_led_operation(led->pin, onoff);
         }
     } else if (ctx->recv_dst == 0xFFFF) {
-        led = &led_state[model->element->element_addr - primary_addr];
+        //led = &led_state[model->element->element_addr - primary_addr];
         //board_led_operation(led->pin, onoff);
     }
 }
@@ -275,6 +264,20 @@ static void example_ble_mesh_generic_server_cb(esp_ble_mesh_generic_server_cb_ev
     }
 }
 
+static void example_ble_mesh_generic_client_cb(esp_ble_mesh_cfg_server_cb_event_t event,
+                                              esp_ble_mesh_cfg_server_cb_param_t *param)
+{
+    ESP_LOGI(TAG, "SUCCESFULL CALLBACK! event 0x%02x, opcode 0x%04x, src 0x%04x, dst 0x%04x",
+        event, param->ctx.recv_op, param->ctx.addr, param->ctx.recv_dst);
+}
+
+static void esp_ble_mesh_model_cb(esp_ble_mesh_cfg_server_cb_event_t event,
+        esp_ble_mesh_cfg_server_cb_param_t *param)
+{
+    ESP_LOGI(TAG, "SUCCESFULL CALLBACK 2! event 0x%02x, opcode 0x%04x, src 0x%04x, dst 0x%04x",
+        event, param->ctx.recv_op, param->ctx.addr, param->ctx.recv_dst);
+}
+
 static void example_ble_mesh_config_server_cb(esp_ble_mesh_cfg_server_cb_event_t event,
                                               esp_ble_mesh_cfg_server_cb_param_t *param)
 {
@@ -313,6 +316,10 @@ static void example_ble_mesh_config_server_cb(esp_ble_mesh_cfg_server_cb_event_t
 static esp_err_t ble_mesh_init(void)
 {
     esp_err_t err = ESP_OK;
+
+    esp_ble_mesh_register_generic_client_callback(example_ble_mesh_generic_client_cb);//doesnt work
+    esp_ble_mesh_register_custom_model_callback(esp_ble_mesh_model_cb); //doesnt work
+
 
     esp_ble_mesh_register_prov_callback(example_ble_mesh_provisioning_cb);
     esp_ble_mesh_register_config_server_callback(example_ble_mesh_config_server_cb);
@@ -374,6 +381,7 @@ void app_main(void)
         ESP_LOGE(TAG, "Bluetooth mesh init failed (err %d)", err);
     }
 
+
     lighting_type = ON_BREATHING;
 
     red_channel = 0;
@@ -382,8 +390,13 @@ void app_main(void)
 
 
     while(1) {
-    	if(!HAS_APPKEY) {
-    	switch (lighting_type) {
+    	if(HAS_APPKEY) {
+    	    //esp_ble_mesh_model_subscribe_group_addr(element_addr, company_id, model_id, group_addr);
+
+    	    if (err) {
+    	        ESP_LOGE(TAG, "Unable to subscribe to group address", err);
+    	    }
+   		switch (lighting_type) {
         	case OFF:
         		LED_setcolor(0, 0, 0);
         		vTaskDelay(pdMS_TO_TICKS(500));
@@ -413,6 +426,9 @@ void app_main(void)
         		vTaskDelay(pdMS_TO_TICKS(500));
         	break;
     	}
+
+    } else {
+    	vTaskDelay(pdMS_TO_TICKS(500));
     }
 
     }

@@ -175,6 +175,7 @@ static void example_ble_mesh_provisioning_cb(esp_ble_mesh_prov_cb_event_t event,
     switch (event) {
     case ESP_BLE_MESH_PROV_REGISTER_COMP_EVT:
         ESP_LOGI(TAG, "ESP_BLE_MESH_PROV_REGISTER_COMP_EVT, err_code %d", param->prov_register_comp.err_code);
+
         break;
     case ESP_BLE_MESH_NODE_PROV_ENABLE_COMP_EVT:
         ESP_LOGI(TAG, "ESP_BLE_MESH_NODE_PROV_ENABLE_COMP_EVT, err_code %d", param->node_prov_enable_comp.err_code);
@@ -675,7 +676,16 @@ void app_main(void)
 {
     esp_err_t err;
 
+    err = i2c_master_init();
+    if (err) {
+        ESP_LOGE(TAG, "I2C init error", err);
+    }
+
     ESP_LOGI(TAG, "Initializing...");
+
+    LED_init();
+    vTaskDelay(pdMS_TO_TICKS(10));
+    LED_setcolor(0, 255, 255);
 
     err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES) {
@@ -683,15 +693,6 @@ void app_main(void)
         err = nvs_flash_init();
     }
     ESP_ERROR_CHECK(err);
-
-    LED_init();
-    vTaskDelay(pdMS_TO_TICKS(10));
-    LED_setcolor(0, 255, 255);
-
-    err = i2c_master_init();
-    if (err) {
-        ESP_LOGE(TAG, "I2C init error", err);
-    }
 
     err = bluetooth_init();
     if (err) {
