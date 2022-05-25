@@ -301,7 +301,7 @@ static esp_err_t ble_mesh_init(void)
 void app_main(void)
 {
     esp_err_t err;
-    uint8_t code = 0;
+    uint8_t code = 1;
 
     ESP_LOGI(TAG, "Initializing...");
 
@@ -343,7 +343,7 @@ void app_main(void)
     	if(HAS_APPKEY) {
     		LED_setcolor(0, 0, 255);
     		// change to ESP_BLE_MESH_MODEL_OP_SENSOR_STATUS to make the client work with provisioner
-    		err = esp_ble_mesh_model_publish(&root_models[1], ESP_BLE_MESH_MODEL_OP_GEN_ONOFF_SET, sizeof(code), &code, ROLE_NODE);
+    		err = esp_ble_mesh_model_publish(&root_models[1], ESP_BLE_MESH_MODEL_OP_GEN_ONOFF_GET, sizeof(code), &code, ROLE_NODE);
     		if (err != ESP_OK) {
     			ESP_LOGE(TAG, "Generic on_off client publish failed (err 0x%x)", err);
     		}
