@@ -5,15 +5,22 @@
 #include "indicator_code.h"
 #include "LED.h"
 
+#include "esp_ble_mesh_common_api.h"
+
 #define TAG "indicator_code"
 
 const uint8_t max_val = 255;
 const uint8_t count_max = 100;
+const uint8_t smallest_delay_time_ms = 20;
 
 #define relay_pin 0
 #define buzzer_pin 0
 
-
+/*
+ * Function:  indicator_init
+ * -------------------------
+ * initialises the gpio pins used for the buzzer and relay
+ */
 void indicator_init() {
 
 }
@@ -34,13 +41,26 @@ void set_buzzer(bool buzzer_state) {
 	}
 }
 
-
+/*
+ * Function:  get_indicator_code
+ * -----------------------------
+ *  generates an indicator code used to communicate indicator
+ *  states over the network
+ *
+ *  indicator_colour: colour of the LED
+ *  indicator_effect: effect used to display this colour
+ *  buzzer_state: ON for turning on buzzer, OFF for leaving off
+ *  relay_state: ON for turning on relay, OFF for leaving off
+ *
+ *  returns: indicator code containing led, relay and buzzer information
+ */
 uint8_t get_indicator_code(colour indicator_colour, effect indicator_effect, uint8_t buzzer_state, uint8_t relay_state) {
 	uint8_t code;
 	code = (buzzer_state << 7) | (relay_state << 6) | (indicator_effect << 3) | indicator_colour;
 	//ESP_LOGI(TAG, "Generated colour code 0x%x", code);
 	return code;
 }
+
 
 void convert_code_to_RGB(uint8_t code, uint8_t* red, uint8_t* green, uint8_t* blue) {
 	colour colour_code = code & COLOUR_MASK;
@@ -91,6 +111,19 @@ void convert_code_to_RGB(uint8_t code, uint8_t* red, uint8_t* green, uint8_t* bl
 	}
 }
 
+
+/*
+ * Function:  run_indicator
+ * ------------------------
+ *  controls all indicator outputs, meant to be put in a loop with a small delay (20 ms)
+ *
+ *  code: the indicator code used to configure outputs
+ *  use_buzzer: 	a buzzer use override, set OFF if device has no buzzer
+ *  				so the buzzer pin is never turned high
+ *  use_relay:  	a relay use override, set OFF if device has no relay
+ *  				so the buzzer pin is never turned high
+ *  current_count: 	count used for LED effects, counts to count_max
+ */
 void run_indicator(uint8_t code, uint8_t use_buzzer, uint8_t use_relay, uint8_t* current_count) {
 
 	uint8_t red = 0;
@@ -99,8 +132,8 @@ void run_indicator(uint8_t code, uint8_t use_buzzer, uint8_t use_relay, uint8_t*
 	uint8_t count = *current_count;
 
 	effect effect_used = (code & EFFECT_MASK) >> 3;
-	uint8_t relay = (code & RELAY_MASK) >> 6;
-	uint8_t buzzer = (code & BUZZER_MASK) >> 7;
+	uint8_t relay_state = (code & RELAY_MASK) >> 6;
+	uint8_t buzzer_state = (code & BUZZER_MASK) >> 7;
 
     float breathe_amount = 0;
 
@@ -141,8 +174,9 @@ void run_indicator(uint8_t code, uint8_t use_buzzer, uint8_t use_relay, uint8_t*
 		return;
 	}
 
-	if (use_buzzer > 0) {
-		if(count < (count_max/2) && buzzer > 0) {
+	/* this makes sure the buzzer doesn't run continuously */
+	if (use_buzzer == ON) {
+		if(count < (count_max/2) && buzzer_state > 0) {
 			set_buzzer(ON);
 		}
 		else {
@@ -150,12 +184,8 @@ void run_indicator(uint8_t code, uint8_t use_buzzer, uint8_t use_relay, uint8_t*
 		}
 	}
 
-	if (use_relay > 0) {
-		if(relay > 0) {
-		set_relay(ON);
-		} else {
-		set_relay(OFF);
-		}
+	if (use_relay == ON) {
+		set_relay(relay_state);
 	}
 
 	 if (*current_count >= count_max)
@@ -163,4 +193,25 @@ void run_indicator(uint8_t code, uint8_t use_buzzer, uint8_t use_relay, uint8_t*
 	 else {
 		 (*current_count)++;
 	 }
+}
+
+/*
+ * Function:  run_indicator_as_delay
+ * ---------------------------------
+ *  controls all indicator outputs while used as a delay function
+ *
+ *  code: the indicator code used to configure outputs
+ *  use_buzzer: 		a buzzer use override, set OFF if device has no buzzer
+ *  					so the buzzer pin is never turned high
+ *  use_relay:  		a relay use override, set OFF if device has no relay
+ *  					so the buzzer pin is never turned high
+ *  current_count: 		count used for LED effects, counts to count_max
+ *  delay_repititions:	The amount of delay repetitions (20 ms per repetition standard)
+ */
+void run_indicator_as_delay(uint8_t code, uint8_t use_buzzer, uint8_t use_relay, uint8_t* current_count, uint16_t delay_repititions) {
+
+	for(int i = 0; i < delay_repititions; i++) {
+		run_indicator(code, use_buzzer, use_relay, current_count);
+		vTaskDelay(pdMS_TO_TICKS(smallest_delay_time_ms));
+	}
 }

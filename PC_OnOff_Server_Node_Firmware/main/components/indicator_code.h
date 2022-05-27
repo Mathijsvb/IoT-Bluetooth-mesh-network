@@ -39,5 +39,7 @@ uint8_t get_indicator_code(colour indicator_colour, effect indicator_effect, uin
 
 void run_indicator(uint8_t code, uint8_t use_buzzer, uint8_t use_relay, uint8_t* current_count);
 
+void run_indicator_as_delay(uint8_t code, uint8_t use_buzzer, uint8_t use_relay, uint8_t* current_count, uint16_t delay_repititions);
+
 
 #endif

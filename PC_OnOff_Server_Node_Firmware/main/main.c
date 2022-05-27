@@ -347,10 +347,13 @@ void app_main(void)
 
     root_models[1].pub->publish_addr = 0xFFFF; /* 0xC000-0xFEFF */
     onoff_pub_0.ttl = 7;
+    indicator_code_send = get_indicator_code(GREEN, BREATHING, OFF, OFF);
 
     while(1){
     	if(HAS_APPKEY) {
-    		indicator_code_send = get_indicator_code(GREEN, BREATHING, OFF, OFF);
+
+    		indicator_code_send++; // This is a bit hacky, some codes will not display anything because they contain LED_OFF
+
     	    err = esp_ble_mesh_model_publish(&root_models[1], ESP_BLE_MESH_MODEL_OP_GEN_ONOFF_STATUS, sizeof(indicator_code_send), &indicator_code_send, ROLE_NODE);
     	    if (err) {
     	        ESP_LOGE(TAG, "Server publish failed (err %d)", err);
@@ -367,9 +370,7 @@ void app_main(void)
     	}
 
     	// 2 seconds delay
-    	for(int i = 0; i < 50; i++) {
-    	run_indicator(indicator_code, OFF, OFF, &count);
-    	vTaskDelay(pdMS_TO_TICKS(20));
-    	}
+    	run_indicator_as_delay(indicator_code, OFF, OFF, &count, 100);
     }
+
 }

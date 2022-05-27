@@ -343,7 +343,6 @@ void app_main(void)
     }
 
     while(1){
-    	run_indicator(indicator_code, OFF, OFF, &count);
-    	vTaskDelay(pdMS_TO_TICKS(20));
+    	run_indicator_as_delay(indicator_code, OFF, OFF, &count, 1);
     }
 }
