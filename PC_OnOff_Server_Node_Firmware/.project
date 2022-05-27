@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-	<name>onoff_server</name>
+	<name>PC_OnOff_Server_Node_Firmware</name>
 	<comment></comment>
 	<projects>
 	</projects>
@@ -5242,16 +5242,6 @@
 			<name>esp_idf_components/bt/host/bluedroid/stack/smp/smp_utils.c</name>
 			<type>1</type>
 			<location>C:/Espressif/frameworks/esp-idf-v4.4/components/bt/host/bluedroid/stack/smp/smp_utils.c</location>
-		</link>
-		<link>
-			<name>esp_idf_components/examples/bluetooth/esp_ble_mesh/common_components/button/button.c</name>
-			<type>1</type>
-			<location>C:/Espressif/frameworks/esp-idf-v4.4/examples/bluetooth/esp_ble_mesh/common_components/button/button.c</location>
-		</link>
-		<link>
-			<name>esp_idf_components/examples/bluetooth/esp_ble_mesh/common_components/button/button_obj.cpp</name>
-			<type>1</type>
-			<location>C:/Espressif/frameworks/esp-idf-v4.4/examples/bluetooth/esp_ble_mesh/common_components/button/button_obj.cpp</location>
 		</link>
 		<link>
 			<name>esp_idf_components/examples/bluetooth/esp_ble_mesh/common_components/example_init/ble_mesh_example_init.c</name>
