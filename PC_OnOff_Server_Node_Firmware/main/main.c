@@ -1,5 +1,3 @@
-/* main.c - Application main entry point */
-
 /*
  * SPDX-FileCopyrightText: 2017 Intel Corporation
  * SPDX-FileContributor: 2018-2021 Espressif Systems (Shanghai) CO LTD
@@ -21,7 +19,7 @@
 #include "esp_ble_mesh_generic_model_api.h"
 #include "esp_ble_mesh_local_data_operation_api.h"
 #include "components/LED.h"
-#include "components/indicator_code.h"
+#include "components/peripheral.h"
 
 #include "ble_mesh_example_init.h"
 
@@ -31,9 +29,14 @@
 #define CID_ESP 0x02E5
 
 static uint8_t dev_uuid[16] = { 0x32, 0x10 };
-uint8_t indicator_code = 0;
+
+colour colour_used = CYAN;
+effect effect_used = BLINKING;
 
 static int8_t HAS_APPKEY = false;   /* Flag is true when device is provisioned and has AppKey*/
+
+static uint32_t counter = 0;
+static uint8_t msg = 0b01010101;
 
 static esp_ble_mesh_cfg_srv_t config_server = {
     .relay = ESP_BLE_MESH_RELAY_DISABLED,
@@ -188,7 +191,8 @@ static void example_ble_mesh_provisioning_cb(esp_ble_mesh_prov_cb_event_t event,
     case ESP_BLE_MESH_NODE_PROV_LINK_OPEN_EVT:
         ESP_LOGI(TAG, "ESP_BLE_MESH_NODE_PROV_LINK_OPEN_EVT, bearer %s",
             param->node_prov_link_open.bearer == ESP_BLE_MESH_PROV_ADV ? "PB-ADV" : "PB-GATT");
-        indicator_code = get_indicator_code(YELLOW, STATIC, OFF, OFF);
+		colour_used = YELLOW;
+		effect_used = STATIC;
         break;
     case ESP_BLE_MESH_NODE_PROV_LINK_CLOSE_EVT:
         ESP_LOGI(TAG, "ESP_BLE_MESH_NODE_PROV_LINK_CLOSE_EVT, bearer %s",
@@ -322,7 +326,8 @@ void app_main(void)
     ESP_LOGI(TAG, "Initializing...");
 
     LED_init();
-    indicator_code = get_indicator_code(CYAN, BLINKING, OFF, OFF);
+	colour_used = CYAN;
+	effect_used = BLINKING;
 
     err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES) {
@@ -347,30 +352,41 @@ void app_main(void)
 
     root_models[1].pub->publish_addr = 0xFFFF; /* 0xC000-0xFEFF */
     onoff_pub_0.ttl = 7;
-    indicator_code_send = get_indicator_code(GREEN, BREATHING, OFF, OFF);
+    indicator_code_send = get_indicator_code(GREEN, BREATHING, OFF);
 
     while(1){
     	if(HAS_APPKEY) {
 
     		indicator_code_send++; // This is a bit hacky, some codes will not display anything because they contain LED_OFF
+    		if(indicator_code_send < 0b01101000) {
+    			indicator_code_send = 0b01101000;
+    		}
+    		if(indicator_code_send > 0b01111111) {
+    			indicator_code_send = 0b01101000;
+    		}
 
-    	    err = esp_ble_mesh_model_publish(&root_models[1], ESP_BLE_MESH_MODEL_OP_GEN_ONOFF_STATUS, sizeof(indicator_code_send), &indicator_code_send, ROLE_NODE);
+    		if (counter < 1000){
+    	    err = esp_ble_mesh_model_publish(&root_models[1], ESP_BLE_MESH_MODEL_OP_GEN_ONOFF_STATUS, sizeof(msg), &msg, ROLE_NODE);
     	    if (err) {
     	        ESP_LOGE(TAG, "Server publish failed (err %d)", err);
+    	    } else {
+    	    	counter++;
     	    }
+    		}
+    		printf("counter = %d \n", counter);
 
-    	    indicator_code = get_indicator_code(CYAN, LED_OFF, OFF, OFF);
+    		effect_used = LED_OFF;
 
-    		LED_setcolor(0, 0, 255);
-    		vTaskDelay(pdMS_TO_TICKS(50));
-    		LED_setcolor(0, 0, 0);
+    		//LED_setcolor(0, 0, 255);
+    		//vTaskDelay(pdMS_TO_TICKS(50));
+    		//LED_setcolor(0, 0, 0);
 
     	} else {
-    		indicator_code = get_indicator_code(CYAN, BLINKING, OFF, OFF);
+
     	}
 
     	// 2 seconds delay
-    	run_indicator_as_delay(indicator_code, OFF, OFF, &count, 100);
+    	run_light_as_delay(effect_used, colour_used, &count, 10);
     }
 
 }

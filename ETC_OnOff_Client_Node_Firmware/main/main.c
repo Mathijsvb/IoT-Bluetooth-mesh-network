@@ -1,4 +1,3 @@
-/* main.c - Application main entry point */
 
 /*
  * SPDX-FileCopyrightText: 2017 Intel Corporation
@@ -19,8 +18,7 @@
 #include "esp_ble_mesh_config_model_api.h"
 #include "esp_ble_mesh_generic_model_api.h"
 #include "components/LED.h"
-#include "components/indicator_code.h"
-
+#include "components/peripheral.h"
 #include "ble_mesh_example_init.h"
 #include "ble_mesh_example_nvs.h"
 
@@ -33,9 +31,14 @@
 #define CID_ESP 0x02E5
 
 static uint8_t dev_uuid[16] = { 0x32, 0x10 };
+static node_type used_node_type = BUTTONS_VIB_NODE;
 
 static int8_t HAS_APPKEY = false;   /* Flag is true when device is provisioned and has AppKey*/
-volatile uint8_t indicator_code = 0;
+static uint8_t indicator_code = 0;
+
+static uint32_t counter = 0;
+static uint8_t msg = 0b01010101;
+
 
 static struct example_info_store {
     uint16_t net_idx;   /* NetKey Index */
@@ -155,7 +158,7 @@ static void example_ble_mesh_provisioning_cb(esp_ble_mesh_prov_cb_event_t event,
     case ESP_BLE_MESH_NODE_PROV_LINK_OPEN_EVT:
         ESP_LOGI(TAG, "ESP_BLE_MESH_NODE_PROV_LINK_OPEN_EVT, bearer %s",
             param->node_prov_link_open.bearer == ESP_BLE_MESH_PROV_ADV ? "PB-ADV" : "PB-GATT");
-        indicator_code = get_indicator_code(YELLOW, STATIC, OFF, OFF);
+        indicator_code = get_indicator_code(YELLOW, STATIC, OFF);
         break;
     case ESP_BLE_MESH_NODE_PROV_LINK_CLOSE_EVT:
         ESP_LOGI(TAG, "ESP_BLE_MESH_NODE_PROV_LINK_CLOSE_EVT, bearer %s",
@@ -206,6 +209,36 @@ void example_ble_mesh_send_gen_onoff_set(void)
     mesh_example_info_store(); /* Store proper mesh example info */
 }
 
+void example_ble_mesh_send_gen_onoff_status(void) // added
+{
+    esp_ble_mesh_generic_client_set_state_t set = {0};
+    esp_ble_mesh_client_common_param_t common = {0};
+    esp_err_t err = ESP_OK;
+
+    common.opcode = ESP_BLE_MESH_MODEL_OP_GEN_ONOFF_SET_UNACK;
+    common.model = onoff_client.model;
+    common.ctx.net_idx = store.net_idx;
+    common.ctx.app_idx = store.app_idx;
+    common.ctx.addr = 0xFFFF;   /* to all nodes */
+    common.ctx.send_ttl = 3;
+    common.ctx.send_rel = false;
+    common.msg_timeout = 0;     /* 0 indicates that timeout value from menuconfig will be used */
+    common.msg_role = ROLE_NODE;
+
+    set.onoff_set.op_en = false;
+    set.onoff_set.onoff = 0b10000000;
+    set.onoff_set.tid = store.tid++;
+
+    err = esp_ble_mesh_generic_client_set_state(&common, &set);
+    if (err) {
+        ESP_LOGE(TAG, "Send Generic OnOff status failed");
+        return;
+    }
+
+    //store.onoff = !store.onoff;
+    //mesh_example_info_store(); /* Store proper mesh example info */
+}
+
 static void example_ble_mesh_generic_client_cb(esp_ble_mesh_generic_client_cb_event_t event,
                                                esp_ble_mesh_generic_client_cb_param_t *param)
 {
@@ -230,7 +263,11 @@ static void example_ble_mesh_generic_client_cb(esp_ble_mesh_generic_client_cb_ev
 
         ESP_LOGI(TAG, "ESP_BLE_MESH_MODEL_OP_GEN_ONOFF_SET, code %d", param->status_cb.onoff_status.present_onoff);
 
-        indicator_code = param->status_cb.onoff_status.present_onoff;
+        indicator_code = check_if_code_type(param->status_cb.onoff_status.present_onoff, indicator_code, used_node_type);
+
+        if(msg == param->status_cb.onoff_status.present_onoff) {
+        	counter++;
+        }
 
         break;
     case ESP_BLE_MESH_GENERIC_CLIENT_TIMEOUT_EVT:
@@ -256,8 +293,11 @@ static void example_ble_mesh_config_server_cb(esp_ble_mesh_cfg_server_cb_event_t
                 param->value.state_change.appkey_add.net_idx,
                 param->value.state_change.appkey_add.app_idx);
             ESP_LOG_BUFFER_HEX("AppKey", param->value.state_change.appkey_add.app_key, 16);
-            root_models[1].keys[0] = param->value.state_change.appkey_add.app_idx; // added
-            indicator_code = get_indicator_code(YELLOW, LED_OFF, OFF, OFF);
+
+            root_models[1].keys[0] = param->value.state_change.appkey_add.app_idx;
+
+            indicator_code = get_indicator_code(YELLOW, LED_OFF, OFF);
+
             HAS_APPKEY = true;
             break;
         case ESP_BLE_MESH_MODEL_OP_MODEL_APP_BIND:
@@ -309,11 +349,12 @@ void app_main(void)
     esp_err_t err;
 
     uint8_t count = 0;
+    uint8_t buzzer_count = 0;
 
     ESP_LOGI(TAG, "Initializing...");
 
     LED_init();
-    indicator_code = get_indicator_code(CYAN, BLINKING, OFF, OFF);
+    indicator_code = get_indicator_code(CYAN, BLINKING, OFF);
 
     err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES) {
@@ -343,6 +384,8 @@ void app_main(void)
     }
 
     while(1){
-    	run_indicator_as_delay(indicator_code, OFF, OFF, &count, 1);
+    	printf("counter = %d \n", counter);
+    	run_client_as_delay(&indicator_code, used_node_type, &count,  &buzzer_count, 50);
+    	//example_ble_mesh_send_gen_onoff_status();
     }
 }

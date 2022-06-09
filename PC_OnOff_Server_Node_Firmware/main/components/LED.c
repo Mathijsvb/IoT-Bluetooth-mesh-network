@@ -1,3 +1,12 @@
+/* ########################################################
+ *
+ * Author: Ciarán Lichtenberg
+ * Purpose: Initiates and controls the on board LED of the m5 Stack C3
+ * Date: 07/06/2022 (dd/mm/yyyy)
+ *
+ * ########################################################
+ */
+
 #include "stdio.h"
 #include "esp_log.h"
 #include "driver/rmt.h"
