@@ -26,7 +26,7 @@
 #define PROV_OWN_ADDR       0x0001
 
 
-#define MSG_SEND_TTL        3
+#define MSG_SEND_TTL        7
 #define MSG_SEND_REL        false
 #define MSG_TIMEOUT         0
 #define MSG_ROLE            ROLE_PROVISIONER

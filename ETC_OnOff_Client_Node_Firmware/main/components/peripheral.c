@@ -13,6 +13,10 @@
 
 #define TAG "PERIPHERAL"
 
+#define relay_pin 0
+#define buzzer_pin 0
+#define button_pins[2] = {0, 0}
+
 /* max RGB value */
 const uint8_t max_val = 255;
 
@@ -23,15 +27,12 @@ const uint8_t smallest_delay_time_ms = 20;
 /* buzzer */
 const uint8_t times_vib = 3;
 
-#define relay_pin 0
-#define buzzer_pin 0
-
 /*
  * Function:  indicator_init
  * -------------------------
  * initialises the gpio pins used for the buzzer and relay
  */
-void indicator_init(node_type node) {
+void node_init(node_type node) {
 	//ToDo: add init
 }
 
@@ -265,6 +266,10 @@ uint8_t check_if_code_type(uint8_t code, uint8_t old_code, uint8_t node) {
 	  return 0;
   }
 
+}
+
+bool check_if_button_pressed(uint8_t button_number) {
+	return true;
 }
 
 /*

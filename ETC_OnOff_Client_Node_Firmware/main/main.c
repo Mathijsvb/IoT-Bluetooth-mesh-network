@@ -158,7 +158,7 @@ static void example_ble_mesh_provisioning_cb(esp_ble_mesh_prov_cb_event_t event,
     case ESP_BLE_MESH_NODE_PROV_LINK_OPEN_EVT:
         ESP_LOGI(TAG, "ESP_BLE_MESH_NODE_PROV_LINK_OPEN_EVT, bearer %s",
             param->node_prov_link_open.bearer == ESP_BLE_MESH_PROV_ADV ? "PB-ADV" : "PB-GATT");
-        indicator_code = get_indicator_code(YELLOW, STATIC, OFF);
+        indicator_code = get_indicator_code(PURPLE, STATIC, OFF);
         break;
     case ESP_BLE_MESH_NODE_PROV_LINK_CLOSE_EVT:
         ESP_LOGI(TAG, "ESP_BLE_MESH_NODE_PROV_LINK_CLOSE_EVT, bearer %s",
@@ -296,7 +296,7 @@ static void example_ble_mesh_config_server_cb(esp_ble_mesh_cfg_server_cb_event_t
 
             root_models[1].keys[0] = param->value.state_change.appkey_add.app_idx;
 
-            indicator_code = get_indicator_code(YELLOW, LED_OFF, OFF);
+            indicator_code = get_indicator_code(PURPLE, LED_OFF, OFF);
 
             HAS_APPKEY = true;
             break;
