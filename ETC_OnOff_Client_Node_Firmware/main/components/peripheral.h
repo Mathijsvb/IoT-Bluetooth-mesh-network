@@ -51,7 +51,7 @@ typedef enum {
 	RELAY_NODE
 } node_type;
 
-//void node_init(node_type node);
+void node_init(node_type node);
 
 void set_relay(bool relay_state);
 
@@ -76,5 +76,11 @@ void run_client_as_delay(uint8_t* code, node_type node, uint8_t* current_count, 
 void run_light_as_delay(effect effect_used, colour colour_used, uint8_t* current_count, uint16_t delay_repititions);
 
 void display_code(uint8_t code);
+
+void publish_msg(uint8_t code);
+
+void peripheral_init(node_type node);
+
+void set_AppKey();
 
 #endif

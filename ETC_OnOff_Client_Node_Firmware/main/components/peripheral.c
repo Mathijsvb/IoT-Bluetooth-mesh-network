@@ -10,12 +10,27 @@
  */
 
 #include "peripheral.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+
+#include "driver/gpio.h"
+
+#include "esp_ble_mesh_common_api.h"
+#include "esp_ble_mesh_networking_api.h"
+#include "esp_ble_mesh_provisioning_api.h"
+#include "esp_ble_mesh_generic_model_api.h"
 
 #define TAG "PERIPHERAL"
 
-#define relay_pin 0
-#define buzzer_pin 0
-#define button_pins[2] = {0, 0}
+/* pin declarations */
+const uint8_t relay_pin = 0;
+const uint8_t buzzer_and_relay_pin = 0;
+const uint32_t button_pins[2] = {3, 6};
 
 /* max RGB value */
 const uint8_t max_val = 255;
@@ -27,31 +42,32 @@ const uint8_t smallest_delay_time_ms = 20;
 /* buzzer */
 const uint8_t times_vib = 3;
 
-/*
- * Function:  indicator_init
- * -------------------------
- * initialises the gpio pins used for the buzzer and relay
- */
-void node_init(node_type node) {
-	//ToDo: add init
-}
+#define GPIO_INPUT_PIN_SEL  ((1ULL<<button_pins[0]) | (1ULL<<button_pins[1]))
+#define GPIO_OUTPUT_PIN_SEL (1ULL<<buzzer_and_relay_pin)
+#define ESP_INTR_FLAG_DEFAULT 0
+static xQueueHandle gpio_evt_queue = NULL;
+static uint8_t *HAS_APPKEY = false;
+
+ESP_BLE_MESH_MODEL_PUB_DEFINE(onoff_pub_0, 2 + 3, ROLE_NODE);
+static esp_ble_mesh_gen_onoff_srv_t onoff_server_0 = {
+    .rsp_ctrl.get_auto_rsp = ESP_BLE_MESH_SERVER_AUTO_RSP,
+    .rsp_ctrl.set_auto_rsp = ESP_BLE_MESH_SERVER_AUTO_RSP,
+};
+
+static esp_ble_mesh_model_t control_model = ESP_BLE_MESH_MODEL_GEN_ONOFF_SRV(&onoff_pub_0, &onoff_server_0);
+
 
 void set_relay(bool pys_mute_state) {
-  //ToDo: add pin functions
+
   if (pys_mute_state) {
-
+	  gpio_set_level(buzzer_and_relay_pin, false);
   } else {
-
+	  gpio_set_level(buzzer_and_relay_pin, true);
   }
 }
 
 void set_vib(bool vib_state) {
-  //ToDo: add pin functions
-  if (vib_state) {
-
-  } else {
-
-  }
+	gpio_set_level(buzzer_and_relay_pin, vib_state);
 }
 
 /*
@@ -416,4 +432,140 @@ void display_code(uint8_t code) {
     ESP_LOGI(TAG, "Undefined Code: %d%d%d%d%d%d%d%d", (code & 0b10000000) >> 7, (code & 0b01000000) >> 6, (code & 0b00100000) >> 5, (code & 0b00010000) >> 4, (code & 0b00001000) >> 3, (code & 0b00000100) >> 2, (code & 0b00000010) >> 1, (code & 0b00000001));
   }
 
+}
+
+
+/* --------------------------------
+ *  publishing code for the PC node
+ * --------------------------------
+ */
+
+void publish_msg(uint8_t code) {
+
+    esp_err_t err;
+
+    if((*HAS_APPKEY) == false) {
+    	ESP_LOGW(TAG, "Can't publish control message when unprovisioned");
+    } else {
+    	err = esp_ble_mesh_model_publish(&control_model, ESP_BLE_MESH_MODEL_OP_GEN_ONOFF_STATUS, sizeof(code), &code, ROLE_NODE);
+        if (err) {
+            ESP_LOGE(TAG, "Control code publish failed (err %d)", err);
+        }
+    }
+
+}
+
+
+/* ----------------------------
+ *  Button code for the remote
+ * ----------------------------
+ */
+
+
+static void IRAM_ATTR gpio_isr_handler(void* arg)
+{
+    uint32_t gpio_num = (uint32_t) arg;
+    xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
+}
+
+static void button_task(void* arg)
+{
+    uint32_t gpio_num;
+    uint8_t msg = 0;
+    uint8_t button_state;
+
+    ESP_LOGI(TAG, "Button_task initialised");
+
+    for(;;) {
+
+        if(xQueueReceive(gpio_evt_queue, &gpio_num, portMAX_DELAY)) {
+
+            button_state = gpio_get_level(gpio_num);
+
+            if(gpio_num == button_pins[0]) {
+        		//msg = get_control_code(false, false, true, button_state);
+        		ESP_LOGI(TAG, "Button pin %d update! physical mute state: %d", gpio_num, button_state);
+        		msg = get_indicator_code(GREEN, (~button_state & 0b00000001), OFF);
+        	}
+            else if(gpio_num == button_pins[1]) {
+        		//msg = get_control_code(true, button_state, false, false);
+        		ESP_LOGI(TAG, "Button pin %d update! online mute state: %d", gpio_num, button_state);
+        		msg = get_indicator_code(BLUE, (~button_state & 0b00000001), OFF);
+        	} else {
+        		ESP_LOGW(TAG, "Unknown gpio pin number");
+        		return;
+        	}
+
+            publish_msg(msg);
+
+        }
+    }
+}
+
+void peripheral_init(node_type node) {
+	// set publishing address and TTL
+	control_model.pub->publish_addr = 0xFFFF; /* 0xC000-0xFEFF */
+	onoff_pub_0.ttl = 7;
+
+	if(node != BUTTONS_VIB_NODE && node != RELAY_NODE) {
+		return;
+	}
+
+	gpio_config_t io_conf;
+	esp_err_t err;
+
+	io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
+	io_conf.mode = GPIO_MODE_OUTPUT;
+	io_conf.pin_bit_mask = GPIO_OUTPUT_PIN_SEL;
+    io_conf.pull_down_en = true;
+    io_conf.pull_up_en = false;
+
+	err = gpio_config(&io_conf);
+    if (err) {
+        ESP_LOGE(TAG, "IO config vib and relay failed (err %d)", err);
+    } else {
+    	ESP_LOGI(TAG, "IO config vib and relay successful");
+    }
+
+	if(node != BUTTONS_VIB_NODE) {
+		return;
+	}
+
+	gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
+
+	io_conf.intr_type = GPIO_INTR_ANYEDGE;
+	io_conf.mode = GPIO_MODE_INPUT;
+	io_conf.pin_bit_mask = GPIO_INPUT_PIN_SEL;
+	io_conf.pull_up_en = true;
+	io_conf.pull_down_en = false;
+
+	err = gpio_config(&io_conf);
+    if (err) {
+        ESP_LOGE(TAG, "IO config buttons failed (err %d)", err);
+    } else {
+    	ESP_LOGI(TAG, "IO config buttons successful");
+    }
+
+	err = gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
+    if (err) {
+    	ESP_LOGE(TAG, "Installing ISR service failed (err %d)", err);
+    } else {
+    	ESP_LOGI(TAG, "Installing ISR successful");
+    }
+
+
+	for(uint8_t i = 0; i < (sizeof(button_pins) / sizeof(button_pins[0])); i++) {
+		err = gpio_isr_handler_add(button_pins[i], gpio_isr_handler, (void*) button_pins[i]);
+		if (err) {
+		    ESP_LOGE(TAG, "Adding ISR failed (err %d)", err);
+		} else {
+		    ESP_LOGI(TAG, "Adding ISR successful");
+		}
+	}
+
+	xTaskCreate(button_task, "gpio_task_example", 2048, NULL, 10, NULL);
+}
+
+void set_AppKey(uint8_t * newAppKey) {
+	HAS_APPKEY = newAppKey;
 }

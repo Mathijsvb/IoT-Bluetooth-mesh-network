@@ -34,9 +34,7 @@ colour colour_used = CYAN;
 effect effect_used = BLINKING;
 
 static int8_t HAS_APPKEY = false;   /* Flag is true when device is provisioned and has AppKey*/
-
-static uint32_t counter = 0;
-static uint8_t msg = 0b01010101;
+static uint8_t control_msg = 0;
 
 static esp_ble_mesh_cfg_srv_t config_server = {
     .relay = ESP_BLE_MESH_RELAY_DISABLED,
@@ -320,7 +318,6 @@ void app_main(void)
 {
     esp_err_t err;
 
-    uint8_t indicator_code_send = 0;
     uint8_t count = 0;
 
     ESP_LOGI(TAG, "Initializing...");
@@ -350,43 +347,18 @@ void app_main(void)
         ESP_LOGE(TAG, "Bluetooth mesh init failed (err %d)", err);
     }
 
-    root_models[1].pub->publish_addr = 0xFFFF; /* 0xC000-0xFEFF */
-    onoff_pub_0.ttl = 7;
-    indicator_code_send = get_indicator_code(GREEN, BREATHING, OFF);
+    set_AppKey(&HAS_APPKEY);
 
     while(1){
     	if(HAS_APPKEY) {
-
-    		indicator_code_send++; // This is a bit hacky, some codes will not display anything because they contain LED_OFF
-    		if(indicator_code_send < 0b01101000) {
-    			indicator_code_send = 0b01101000;
-    		}
-    		if(indicator_code_send > 0b01111111) {
-    			indicator_code_send = 0b01101000;
-    		}
-
-    		if (counter < 1000){
-    	    err = esp_ble_mesh_model_publish(&root_models[1], ESP_BLE_MESH_MODEL_OP_GEN_ONOFF_STATUS, sizeof(msg), &msg, ROLE_NODE);
-    	    if (err) {
-    	        ESP_LOGE(TAG, "Server publish failed (err %d)", err);
-    	    } else {
-    	    	counter++;
-    	    }
-    		}
-    		printf("counter = %d \n", counter);
-
     		effect_used = LED_OFF;
 
-    		//LED_setcolor(0, 0, 255);
-    		//vTaskDelay(pdMS_TO_TICKS(50));
-    		//LED_setcolor(0, 0, 0);
-
-    	} else {
+    		// control_msg = get_control_code(false, false, true, pys_mute_state)
+    		// publish_msg(control_msg)
 
     	}
 
-    	// 2 seconds delay
-    	run_light_as_delay(effect_used, colour_used, &count, 10);
+    	run_light_as_delay(effect_used, colour_used, &count, 5);
     }
 
 }
