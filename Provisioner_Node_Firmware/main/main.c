@@ -14,15 +14,18 @@
 #include "ble_mesh_example_init.h"
 #include "components/BLE_Mesh.h"
 #include "components/LED.h"
+#include "components/peripheral.h"
 
 #define TAG "MAIN"
 
-
-
 void app_main(void)
 {
+	uint8_t count = 0;
+
 	esp_err_t err = ESP_OK;
 	ESP_LOGI(TAG, "Initializing...");
+
+	LED_init();
 
 	err = nvs_flash_init();
 	if (err == ESP_ERR_NVS_NO_FREE_PAGES) {
@@ -30,10 +33,6 @@ void app_main(void)
 	    err = nvs_flash_init();
 	}
 	ESP_ERROR_CHECK(err);
-
-	LED_init();
-	vTaskDelay(pdMS_TO_TICKS(10));
-	LED_setcolor(200,200,200);
 
 	err = bluetooth_init();
 	if (err != ESP_OK) {
@@ -45,4 +44,10 @@ void app_main(void)
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Bluetooth mesh init failed (err %d)", err);
     }
+
+    run_lights(BLINKING, WHITE, 0);
+//    while(1) {
+//    	run_light_as_delay(BLINKING, WHITE, &count, 50);
+//    }
+
 }

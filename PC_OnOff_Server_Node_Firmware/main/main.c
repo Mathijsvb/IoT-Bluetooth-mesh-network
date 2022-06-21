@@ -34,7 +34,6 @@ colour colour_used = CYAN;
 effect effect_used = BLINKING;
 
 static int8_t HAS_APPKEY = false;   /* Flag is true when device is provisioned and has AppKey*/
-static uint8_t control_msg = 0;
 
 static esp_ble_mesh_cfg_srv_t config_server = {
     .relay = ESP_BLE_MESH_RELAY_DISABLED,
@@ -160,7 +159,6 @@ static void example_handle_gen_onoff_msg(esp_ble_mesh_model_t *model,
         if (set->op_en == false) {
             srv->state.onoff = set->onoff;
         } else {
-            /* TODO: Delay and state transition */
             srv->state.onoff = set->onoff;
         }
         if (ctx->recv_op == ESP_BLE_MESH_MODEL_OP_GEN_ONOFF_SET) {

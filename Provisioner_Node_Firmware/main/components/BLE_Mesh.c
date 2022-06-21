@@ -12,11 +12,15 @@
 #include "esp_ble_mesh_sensor_model_api.h"
 #include "esp_ble_mesh_generic_model_api.h"
 
+#include "esp_ble_mesh_provisioning_api.h"
+
 #include "ble_mesh_example_init.h"
 #include "LED.h"
+#include "peripheral.h"
 
 #define TAG "BLE_Mesh"
 #define DATA_TAG "DATA"
+#define CONTROL_TAG "CONTROL"
 #define CID_ESP             0x02E5
 
 
@@ -26,7 +30,7 @@
 #define PROV_OWN_ADDR       0x0001
 
 
-#define MSG_SEND_TTL        7
+#define MSG_SEND_TTL        3
 #define MSG_SEND_REL        false
 #define MSG_TIMEOUT         0
 #define MSG_ROLE            ROLE_PROVISIONER
@@ -207,11 +211,11 @@ static void example_ble_mesh_provisioning_cb(esp_ble_mesh_prov_cb_event_t event,
         break;
     case ESP_BLE_MESH_PROVISIONER_PROV_LINK_OPEN_EVT:
         ESP_LOGI(TAG, "ESP_BLE_MESH_PROVISIONER_PROV_LINK_OPEN_EVT, bearer %s", param->provisioner_prov_link_open.bearer == ESP_BLE_MESH_PROV_ADV ? "PB-ADV" : "PB-GATT");
-        LED_setcolor(255,255,0);
+        run_lights(STATIC, PURPLE, 0);
         break;
     case ESP_BLE_MESH_PROVISIONER_PROV_LINK_CLOSE_EVT:
         ESP_LOGI(TAG, "ESP_BLE_MESH_PROVISIONER_PROV_LINK_CLOSE_EVT, bearer %s, reason 0x%02x", param->provisioner_prov_link_close.bearer == ESP_BLE_MESH_PROV_ADV ? "PB-ADV" : "PB-GATT", param->provisioner_prov_link_close.reason);
-        LED_setcolor(0,255,0);
+        run_lights(STATIC, GREEN, 0);
         break;
     case ESP_BLE_MESH_PROVISIONER_PROV_COMPLETE_EVT:
         prov_complete(param->provisioner_prov_complete.node_idx, param->provisioner_prov_complete.device_uuid, param->provisioner_prov_complete.unicast_addr, param->provisioner_prov_complete.element_num, param->provisioner_prov_complete.netkey_idx);
@@ -579,7 +583,7 @@ static void example_ble_mesh_generic_client_cb(esp_ble_mesh_generic_client_cb_ev
     case ESP_BLE_MESH_GENERIC_CLIENT_PUBLISH_EVT:
         ESP_LOGI(TAG, "ESP_BLE_MESH_GENERIC_CLIENT_PUBLISH_EVT");
 
-        ESP_LOGI(TAG, "ESP_BLE_MESH_MODEL_OP_GEN_ONOFF_SET, onoff %d", param->status_cb.onoff_status.present_onoff);
+        ESP_LOG_LEVEL(ESP_LOG_INFO, CONTROL_TAG, "0x%04x 0x%04x %d%d%d%d%d%d%d%d end", param->params->ctx.recv_dst, param->params->ctx.addr , (param->status_cb.onoff_status.present_onoff & 0b10000000) >> 7, (param->status_cb.onoff_status.present_onoff & 0b01000000) >> 6, (param->status_cb.onoff_status.present_onoff & 0b00100000) >> 5, (param->status_cb.onoff_status.present_onoff & 0b00010000) >> 4, (param->status_cb.onoff_status.present_onoff & 0b00001000) >> 3, (param->status_cb.onoff_status.present_onoff & 0b00000100) >> 2, (param->status_cb.onoff_status.present_onoff & 0b00000010) >> 1, (param->status_cb.onoff_status.present_onoff & 0b00000001));
 
         break;
     case ESP_BLE_MESH_GENERIC_CLIENT_TIMEOUT_EVT:

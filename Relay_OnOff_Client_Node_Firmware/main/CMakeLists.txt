@@ -1,5 +1,4 @@
 set(srcs "main.c"
-        "components/BLE_Mesh.c"
         "components/LED.c"
         "components/peripheral.c")
 

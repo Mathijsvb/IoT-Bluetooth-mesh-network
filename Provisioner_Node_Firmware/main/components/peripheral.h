@@ -48,10 +48,9 @@ typedef enum {
 typedef enum {
 	BUTTONS_VIB_NODE,
 	LED_NODE,
-	RELAY_NODE
+	RELAY_NODE,
+	PC_NODE
 } node_type;
-
-void node_init(node_type node);
 
 void set_relay(bool relay_state);
 
@@ -69,7 +68,7 @@ uint8_t check_if_code_type(uint8_t code, uint8_t old_code, uint8_t code_type);
 
 void run_indicator_client(uint8_t* code, node_type node, uint8_t* current_count,  uint8_t* buzzer_count);
 
-void run_control_client(uint8_t * control_code, node_type node);
+void run_control_client(uint8_t * control_code, node_type node, uint8_t * current_count);
 
 void run_client_as_delay(uint8_t* code, node_type node, uint8_t* current_count,  uint8_t* buzzer_count, uint16_t delay_repititions);
 
@@ -81,6 +80,6 @@ void publish_msg(uint8_t code);
 
 void peripheral_init(node_type node);
 
-void set_AppKey();
+void set_AppKey(int8_t * newAppKey);
 
 #endif

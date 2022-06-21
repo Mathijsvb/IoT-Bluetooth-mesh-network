@@ -47,6 +47,8 @@ const uint8_t times_vib = 3;
 #define ESP_INTR_FLAG_DEFAULT 0
 static xQueueHandle gpio_evt_queue = NULL;
 static int8_t *HAS_APPKEY = false;
+uint8_t old_relay_state = 2;
+uint8_t old_button_state = 2;
 
 ESP_BLE_MESH_MODEL_PUB_DEFINE(onoff_pub_0, 2 + 3, ROLE_NODE);
 static esp_ble_mesh_gen_onoff_srv_t onoff_server_0 = {
@@ -58,12 +60,30 @@ static esp_ble_mesh_model_t control_model = ESP_BLE_MESH_MODEL_GEN_ONOFF_SRV(&on
 
 
 void set_relay(bool pys_mute_state) {
+  esp_err_t err;
+
+  if(pys_mute_state == old_relay_state) {
+	  return;
+  }
 
   if (pys_mute_state) {
-	  gpio_set_level(buzzer_and_relay_pin, false);
+	  err = gpio_set_level(buzzer_and_relay_pin, false);
+	  if (err) {
+	    ESP_LOGI(TAG, "Relay OFF failed");
+	  } else {
+	    ESP_LOGI(TAG, "Relay OFF");
+	  }
+
   } else {
-	  gpio_set_level(buzzer_and_relay_pin, true);
+	  err = gpio_set_level(buzzer_and_relay_pin, true);
+	  if (err) {
+	    ESP_LOGI(TAG, "Relay ON failed");
+	  } else {
+	    ESP_LOGI(TAG, "Relay ON");
+	  }
   }
+
+  old_relay_state = pys_mute_state;
 }
 
 void set_vib(bool vib_state) {
@@ -470,7 +490,6 @@ void publish_msg(uint8_t code) {
  * ----------------------------
  */
 
-
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
     uint32_t gpio_num = (uint32_t) arg;
@@ -491,6 +510,11 @@ static void button_task(void* arg)
 
             button_state = gpio_get_level(gpio_num);
 
+            if(button_state == old_button_state) {
+            	ESP_LOGW(TAG, "Pin toggle triggered ISR even though pin state is the same, skipping publish");
+            	continue ;
+            }
+
             if(gpio_num == button_pins[0]) {
         		msg = get_control_code(false, false, true, button_state);
         		ESP_LOGI(TAG, "Button pin %d update! physical mute state: %d", gpio_num, button_state);
@@ -501,10 +525,16 @@ static void button_task(void* arg)
         		//msg = get_indicator_code(BLUE, (~button_state & 0b00000001), OFF);
         	} else {
         		ESP_LOGW(TAG, "Unknown gpio pin number");
-        		return;
+        		continue;
         	}
 
             publish_msg(msg);
+
+        	// Since the hardware button doens't contain a debouncing cap a delay is needed before measuring
+        	vTaskDelay(pdMS_TO_TICKS(20));
+        	xQueueReset(gpio_evt_queue); // remove false ISR triggers caused by bouncing from queue
+
+            old_button_state = button_state;
 
         }
     }
